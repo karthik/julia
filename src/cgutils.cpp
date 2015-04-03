@@ -580,13 +580,17 @@ static Type *julia_struct_to_llvm(jl_value_t *jt)
             }
             if (!isTuple) {
                 structdecl->setBody(latypes);
-            } else {
+            }
+            else {
                 if (isvector && lasttype != T_int1 && lasttype != T_void) {
-                    if (lasttype->isSingleValueType() && !lasttype->isVectorTy())
-                        jst->struct_decl = VectorType::get(lasttype,ntypes);
-                    else
+                    // TODO: don't use vector types for now; I believe they lead to
+                    // mis-aligned stores when boxing tuples.
+                    //if (lasttype->isSingleValueType() && !lasttype->isVectorTy())
+                    //    jst->struct_decl = VectorType::get(lasttype,ntypes);
+                    //else
                         jst->struct_decl = ArrayType::get(lasttype,ntypes);
-                } else {
+                }
+                else {
                     jst->struct_decl = StructType::get(jl_LLVMContext,ArrayRef<Type*>(&latypes[0],i));
                 }
             }
@@ -1156,13 +1160,13 @@ static Value *emit_getfield_unknownidx(Value *strct, Value *idx, jl_datatype_t *
         }
     }
     else if (is_tupletype_homogeneous(stt->types)) {
-        assert(llvm_st->isStructTy());
         // TODO: move these allocas to the first basic block instead of
         // frobbing the stack
         Value *fld;
         if (nfields == 0) {
+            // TODO: pass correct thing to emit_bounds_check ?
             idx = emit_bounds_check(tbaa_decorate(tbaa_const, builder.CreateLoad(prepare_global(jlemptysvec_var))),
-                    NULL, idx, ConstantInt::get(T_size, nfields), ctx);
+                                    NULL, idx, ConstantInt::get(T_size, nfields), ctx);
             fld = UndefValue::get(jl_pvalue_llvmt);
         }
         else {
@@ -1176,6 +1180,7 @@ static Value *emit_getfield_unknownidx(Value *strct, Value *idx, jl_datatype_t *
                 // add root for types not cached
                 jl_add_linfo_root(ctx->linfo, (jl_value_t*)stt);
             }
+            // TODO: pass correct thing to emit_bounds_check ?
             idx = emit_bounds_check(tempSpace, (jl_value_t*)stt, idx, ConstantInt::get(T_size, nfields), ctx);
             fld = typed_load(tempSpace, idx, jt, ctx, stt->mutabl ? tbaa_user : tbaa_immut);
             builder.CreateCall(Intrinsic::getDeclaration(jl_Module,Intrinsic::stackrestore),
@@ -1211,7 +1216,8 @@ static Value *emit_getfield_knownidx(Value *strct, unsigned idx, jl_datatype_t *
     else {
         if (strct->getType()->isVectorTy()) {
             fldv = builder.CreateExtractElement(strct, ConstantInt::get(T_size, idx));
-        } else {
+        }
+        else {
             fldv = builder.CreateExtractValue(strct, ArrayRef<unsigned>(&idx,1));
         }
         if (jfty == (jl_value_t*)jl_bool_type) {

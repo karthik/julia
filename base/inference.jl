@@ -379,6 +379,9 @@ const apply_type_tfunc = function (A, _isva_, args...)
             isVA = false
         end
     end
+    if isVA && length(args) < 2
+        return Bottom
+    end
     tparams = svec()
     for i=2:max(lA,length(args))
         ai = args[i]
@@ -438,7 +441,7 @@ const apply_type_tfunc = function (A, _isva_, args...)
     end
     uncertain && !isa(appl,TypeVar) ? Type{TypeVar(:_,appl)} : Type{appl}
 end
-t_func[apply_type] = (1, Inf, apply_type_tfunc)
+t_func[apply_type] = (2, Inf, apply_type_tfunc)
 
 function tuple_tfunc(t::ANY, limit)
     return limit ? limit_tuple_depth(t) : t
@@ -475,15 +478,13 @@ function builtin_tfunction(f::ANY, args::ANY, argtype::ANY)
         return Any
     end
     tf = tf::Tuple{Real, Real, Function}
-    if isva
-        # only some t-funcs can handle varargs
-        if is(f,apply_type) || is(f,typeof)
-        else
-            return Any
-        end
-    elseif !(tf[1] <= length(argtypes) <= tf[2])
+    if !(tf[1] <= length(argtypes) <= tf[2])
         # wrong # of args
         return Bottom
+    end
+    if isva && !is(f,apply_type)
+        # only some t-funcs can handle varargs
+        return Any
     end
     if is(f,typeassert) || is(f,getfield) || is(f,apply_type) || is(f,fieldtype)
         # TODO: case of apply(), where we do not have the args
@@ -600,10 +601,10 @@ function abstract_call_gf(f, fargs, argtype, e)
             return getfield_tfunc(fargs, argtypes[1], argtypes[2])
         elseif f === Main.Base.next
             isa(e,Expr) && (e.head = :call1)
-            return (getfield_tfunc(fargs, argtypes[1], argtypes[2]), Int)
+            return Tuple{getfield_tfunc(fargs, argtypes[1], argtypes[2]), Int}
         elseif f === Main.Base.indexed_next
             isa(e,Expr) && (e.head = :call1)
-            return (getfield_tfunc(fargs, argtypes[1], argtypes[2]), Int)
+            return Tuple{getfield_tfunc(fargs, argtypes[1], argtypes[2]), Int}
         end
     end
     if (isdefined(Main.Base,:promote_type) && f === Main.Base.promote_type) ||
