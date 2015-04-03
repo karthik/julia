@@ -900,7 +900,7 @@ static jl_value_t *jl_type_intersect(jl_value_t *a, jl_value_t *b,
     jl_datatype_t *sub = NULL;
     jl_value_t *env = NULL;
     jl_value_t *p = NULL;
-    jl_value_t *temp3;
+    jl_value_t *temp3 = NULL;
     JL_GC_PUSH5(&super, &sub, &env, &p, &temp3);
     while (tta != jl_any_type) {
         if (tta->name == ttb->name) {

@@ -1988,7 +1988,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
         if (ctx->linfo->specTypes) {
             rt1 = expr_type(expr, ctx);
             if (jl_is_tuple_type(rt1) && jl_is_leaf_type(rt1) && nargs == jl_datatype_nfields(rt1)) {
-                Value *tpl = emit_new_struct(rt1, nargs, &args[1], ctx);
+                Value *tpl = emit_new_struct(rt1, nargs+1, args, ctx);
                 JL_GC_POP();
                 return tpl;
                 /*
@@ -2222,15 +2222,16 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
         if (fldt == (jl_value_t*)jl_long_type) {
             // VA tuple
             if (jl_is_tuple_type(stt) && ctx->vaStack && symbol_eq(args[1], ctx->vaName)) {
+                // TODO: restore this case
                 Value *valen = emit_n_varargs(ctx);
                 Value *idx = emit_unbox(T_size,
                                         emit_unboxed(args[2], ctx),fldt);
                 idx = emit_bounds_check(builder.CreateGEP(ctx->argArray, ConstantInt::get(T_size, ctx->nReqArgs)),
-                        (jl_value_t*)jl_any_type, idx, valen, ctx);
+                                        (jl_value_t*)jl_any_type, idx, valen, ctx);
                 idx = builder.CreateAdd(idx, ConstantInt::get(T_size, ctx->nReqArgs));
                 JL_GC_POP();
                 return tbaa_decorate(tbaa_user, builder.
-                    CreateLoad(builder.CreateGEP(ctx->argArray,idx),false));
+                                     CreateLoad(builder.CreateGEP(ctx->argArray,idx),false));
             }
             if ((jl_is_structtype(stt) || jl_is_tuple_type(stt)) && !jl_subtype((jl_value_t*)jl_module_type, (jl_value_t*)stt, 0)) {
                 size_t nfields = jl_datatype_nfields(stt);
