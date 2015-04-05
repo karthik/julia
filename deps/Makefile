@@ -661,10 +661,10 @@ update-llvm:
 ## LIBUV ##
 LIBUV_GIT_URL=git://github.com/JuliaLang/libuv.git
 LIBUV_TAR_URL=https://github.com/JuliaLang/libuv/tarball/$1
-$(eval $(call git-external,libuv,LIBUV,configure,.libs/libuv.a))
+$(eval $(call git-external,libuv,LIBUV,configure,.libs/libuv.la))
 
-UV_SRC_TARGET = $(LIBUV_SRC_DIR)/.libs/libuv.a
-UV_OBJ_TARGET = $(build_libdir)/libuv.a
+UV_SRC_TARGET = $(LIBUV_SRC_DIR)/.libs/libuv.la
+UV_OBJ_TARGET = $(build_libdir)/libuv.la
 
 UV_CFLAGS =
 ifeq ($(USEMSVC), 1)
@@ -705,7 +705,7 @@ $(UV_OBJ_TARGET): $(UV_SRC_TARGET)
 
 clean-libuv:
 	-$(MAKE) -C $(LIBUV_SRC_DIR) clean
-	-rm -rf $(build_shlibdir)/libuv.a $(build_includedir)/libuv.h $(build_includedir)/libuv-private
+	-rm -rf $(build_libdir)/libuv.a $(build_libdir)/libuv.la $(build_includedir)/libuv.h $(build_includedir)/libuv-private
 
 get-libuv: $(LIBUV_SRC_DIR)/configure
 configure-libuv: $(LIBUV_SRC_DIR)/config.status
