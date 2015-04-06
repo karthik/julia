@@ -1565,9 +1565,7 @@ static void jl_add_linfo_root(jl_lambda_info_t *li, jl_value_t *val)
     JL_GC_PUSH1(&val);
     li = li->def;
     if (li->roots == NULL) {
-        JL_GC_PUSH1(&val);
         li->roots = jl_alloc_cell_1d(1);
-        JL_GC_POP();
         gc_wb(li, li->roots);
         jl_cellset(li->roots, 0, val);
     }
@@ -1691,14 +1689,16 @@ static Value *emit_getfield(jl_value_t *expr, jl_sym_t *name, jl_codectx_t *ctx)
     }
 
     jl_datatype_t *sty = (jl_datatype_t*)expr_type(expr, ctx);
+    JL_GC_PUSH1(&sty);
     if (jl_is_type_type((jl_value_t*)sty) && jl_is_leaf_type(jl_tparam0(sty)))
         sty = (jl_datatype_t*)jl_typeof(jl_tparam0(sty));
-    JL_GC_PUSH1(&sty);
     if (jl_is_structtype(sty) && sty != jl_module_type && sty->uid != 0) {
         unsigned idx = jl_field_index(sty, name, 0);
         if (idx != (unsigned)-1) {
             Value *strct = emit_expr(expr, ctx, false);
-            emit_getfield_knownidx(strct, idx, sty, ctx);
+            Value *fld = emit_getfield_knownidx(strct, idx, sty, ctx);
+            JL_GC_POP();
+            return fld;
         }
     }
     // TODO: attempt better codegen for approximate types, if the types
@@ -2237,21 +2237,20 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
                 size_t nfields = jl_datatype_nfields(stt);
                 Value *strct = emit_expr(args[1], ctx);
                 // integer index
-                if (jl_is_long(args[2])) {
+                Value *fld;
+                size_t idx;
+                if (jl_is_long(args[2]) && (idx=jl_unbox_long(args[2])-1) < nfields) {
                     // known index
-                    size_t idx = jl_unbox_long(args[2])-1;
-                    if (idx < nfields) {
-                        Value *fld = emit_getfield_knownidx(strct,
-                                                   idx,
-                                                   stt, ctx);
-                        JL_GC_POP();
-                        return fld;
-                    }
+                    fld = emit_getfield_knownidx(strct, idx, stt, ctx);
                 }
                 else {
                     // unknown index
-                    Value *idx = emit_unbox(T_size, emit_unboxed(args[2], ctx), (jl_value_t*)jl_long_type);
-                    emit_getfield_unknownidx(strct, idx, stt, ctx);
+                    Value *vidx = emit_unbox(T_size, emit_unboxed(args[2], ctx), (jl_value_t*)jl_long_type);
+                    fld = emit_getfield_unknownidx(strct, vidx, stt, ctx);
+                }
+                if (fld != NULL) {
+                    JL_GC_POP();
+                    return fld;
                 }
             }
         }

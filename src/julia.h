@@ -246,6 +246,7 @@ typedef struct _jl_datatype_t {
     uint8_t mutabl;
     uint8_t pointerfree;
     // hidden fields:
+    uint32_t nfields;
     int32_t ninitialized;
     uint32_t alignment;  // strictest alignment over all fields
     uint32_t uid;
@@ -573,7 +574,7 @@ STATIC_INLINE jl_value_t *jl_cellset(void *a, size_t i, void *x)
 #define jl_field_name(st,i)    (jl_sym_t*)jl_svecref(((jl_datatype_t*)st)->name->names, (i))
 #define jl_field_type(st,i)    jl_svecref(((jl_datatype_t*)st)->types, (i))
 #define jl_datatype_size(t)    (((jl_datatype_t*)t)->size)
-#define jl_datatype_nfields(t) jl_svec_len(((jl_datatype_t*)(t))->types)
+#define jl_datatype_nfields(t) (((jl_datatype_t*)(t))->nfields)
 
 // basic predicates -----------------------------------------------------------
 #define jl_is_nothing(v)     (((jl_value_t*)(v)) == ((jl_value_t*)jl_nothing))

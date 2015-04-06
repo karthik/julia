@@ -514,9 +514,11 @@ jl_datatype_t *jl_new_abstracttype(jl_value_t *name, jl_datatype_t *super,
 
 jl_datatype_t *jl_new_uninitialized_datatype(size_t nfields)
 {
-    return (jl_datatype_t*)
+    jl_datatype_t *t = (jl_datatype_t*)
         newobj((jl_value_t*)jl_datatype_type,
                NWORDS(sizeof(jl_datatype_t) + nfields*sizeof(jl_fielddesc_t)));
+    t->nfields = nfields;
+    return t;
 }
 
 void jl_compute_field_offsets(jl_datatype_t *st)

@@ -1138,10 +1138,8 @@ static Value *emit_getfield_unknownidx(Value *strct, Value *idx, jl_datatype_t *
                         builder.CreateGEP(
                             builder.CreateBitCast(strct, jl_ppvalue_llvmt),
                             idx)));
-            if ((unsigned)stt->ninitialized != jl_svec_len(stt->types)) {
+            if ((unsigned)stt->ninitialized != jl_svec_len(stt->types))
                 null_pointer_check(fld, ctx);
-            }
-            JL_GC_POP();
             return fld;
         }
         else if (is_tupletype_homogeneous(stt->types)) {
@@ -1149,13 +1147,11 @@ static Value *emit_getfield_unknownidx(Value *strct, Value *idx, jl_datatype_t *
             jl_value_t *jt = jl_field_type(stt->types, 0);
             idx = emit_bounds_check(strct, NULL, idx, ConstantInt::get(T_size, nfields), ctx);
             Value *ptr = data_pointer(strct);
-            JL_GC_POP();
             return typed_load(ptr, idx, jt, ctx, stt->mutabl ? tbaa_user : tbaa_immut);
         }
         else {
             idx = builder.CreateSub(idx, ConstantInt::get(T_size, 1));
             Value *fld = builder.CreateCall2(prepare_call(jlgetnthfieldchecked_func), strct, idx);
-            JL_GC_POP();
             return fld;
         }
     }
@@ -1186,7 +1182,6 @@ static Value *emit_getfield_unknownidx(Value *strct, Value *idx, jl_datatype_t *
             builder.CreateCall(Intrinsic::getDeclaration(jl_Module,Intrinsic::stackrestore),
                                stacksave);
         }
-        JL_GC_POP();
         return fld;
     }
     return NULL;
@@ -1200,13 +1195,11 @@ static Value *emit_getfield_knownidx(Value *strct, unsigned idx, jl_datatype_t *
         Value *addr =
             builder.CreateGEP(builder.CreateBitCast(strct, T_pint8),
                               ConstantInt::get(T_size, jl_field_offset(jt,idx)));
-        JL_GC_POP();
         MDNode *tbaa = jt->mutabl ? tbaa_user : tbaa_immut;
         if (jl_field_isptr(jt,idx)) {
             Value *fldv = tbaa_decorate(tbaa, builder.CreateLoad(builder.CreateBitCast(addr,jl_ppvalue_llvmt)));
-            if (idx >= (unsigned)jt->ninitialized) {
+            if (idx >= (unsigned)jt->ninitialized)
                 null_pointer_check(fldv, ctx);
-            }
             return fldv;
         }
         else {
@@ -1226,7 +1219,6 @@ static Value *emit_getfield_knownidx(Value *strct, unsigned idx, jl_datatype_t *
         else if (jl_field_isptr(jt,idx) && idx >= (unsigned)jt->ninitialized) {
             null_pointer_check(fldv, ctx);
         }
-        JL_GC_POP();
         return mark_julia_type(fldv, jfty);
     }
 }
