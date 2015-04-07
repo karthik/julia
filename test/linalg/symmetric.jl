@@ -1,6 +1,7 @@
 using Base.Test
 
 debug = false #Turn on for more debugging info
+srand(1)
 
 #Pauli σ-matrices
 for σ in map(Hermitian, Any[ eye(2), [0 1; 1 0], [0 -im; im 0], [1 0; 0 -1] ])
