@@ -1692,7 +1692,8 @@ static Value *emit_getfield(jl_value_t *expr, jl_sym_t *name, jl_codectx_t *ctx)
     JL_GC_PUSH1(&sty);
     if (jl_is_type_type((jl_value_t*)sty) && jl_is_leaf_type(jl_tparam0(sty)))
         sty = (jl_datatype_t*)jl_typeof(jl_tparam0(sty));
-    if (jl_is_structtype(sty) && sty != jl_module_type && sty->uid != 0) {
+    if (jl_is_structtype(sty) && sty != jl_module_type && sty->uid != 0 &&
+        jl_is_leaf_type((jl_value_t*)sty)) {
         unsigned idx = jl_field_index(sty, name, 0);
         if (idx != (unsigned)-1) {
             Value *strct = emit_expr(expr, ctx, false);
@@ -1706,7 +1707,7 @@ static Value *emit_getfield(jl_value_t *expr, jl_sym_t *name, jl_codectx_t *ctx)
     JL_GC_POP();
 
     int argStart = ctx->argDepth;
-    Value *arg1 = boxed(emit_expr(expr, ctx),ctx,expr_type(expr,ctx));
+    Value *arg1 = boxed(emit_expr(expr,ctx), ctx, expr_type(expr,ctx));
     // TODO: generic getfield func with more efficient calling convention
     make_gcroot(arg1, ctx);
     Value *arg2 = literal_pointer_val((jl_value_t*)name);
@@ -2219,7 +2220,7 @@ static Value *emit_known_call(jl_value_t *ff, jl_value_t **args, size_t nargs,
         jl_datatype_t *stt = (jl_datatype_t*)expr_type(args[1], ctx);
         jl_value_t *fldt   = expr_type(args[2], ctx);
 
-        if (fldt == (jl_value_t*)jl_long_type) {
+        if (fldt == (jl_value_t*)jl_long_type && jl_is_leaf_type((jl_value_t*)stt)) {
             // VA tuple
             if (jl_is_tuple_type(stt) && ctx->vaStack && symbol_eq(args[1], ctx->vaName)) {
                 // TODO: restore this case

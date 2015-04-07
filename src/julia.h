@@ -632,7 +632,7 @@ STATIC_INLINE jl_value_t *jl_cellset(void *a, size_t i, void *x)
 STATIC_INLINE int jl_is_bitstype(void *v)
 {
     return (jl_is_datatype(v) && jl_is_immutable(v) &&
-            jl_svec_len(((jl_datatype_t*)(v))->types)==0 &&
+            jl_datatype_nfields(v) == 0 &&
             !((jl_datatype_t*)(v))->abstract &&
             ((jl_datatype_t*)(v))->size > 0);
 }

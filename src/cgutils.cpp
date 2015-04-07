@@ -560,7 +560,7 @@ static Type *julia_struct_to_llvm(jl_value_t *jt)
                 structdecl = StructType::create(jl_LLVMContext, jst->name->name->name);
                 jst->struct_decl = structdecl;
             }
-            std::vector<Type *> latypes(0);
+            std::vector<Type*> latypes(0);
             size_t i;
             bool isvector = true;
             Type *lasttype = NULL;
@@ -591,7 +591,7 @@ static Type *julia_struct_to_llvm(jl_value_t *jt)
                         jst->struct_decl = ArrayType::get(lasttype,ntypes);
                 }
                 else {
-                    jst->struct_decl = StructType::get(jl_LLVMContext,ArrayRef<Type*>(&latypes[0],i));
+                    jst->struct_decl = StructType::get(jl_LLVMContext,ArrayRef<Type*>(&latypes[0],ntypes));
                 }
             }
         }
@@ -633,8 +633,7 @@ static jl_value_t *llvm_type_to_julia(Type *t, bool throw_error)
 
 static bool is_datatype_all_pointers(jl_datatype_t *dt)
 {
-    jl_svec_t *t = dt->types;
-    size_t i, l = jl_svec_len(t);
+    size_t i, l = jl_datatype_nfields(dt);
     for(i=0; i < l; i++) {
         if (!dt->fields[i].isptr)
             return false;
@@ -886,8 +885,7 @@ static void raise_exception_if(Value *cond, Value *exc, jl_codectx_t *ctx)
                            exc, ctx);
 }
 
-static void raise_exception_if(Value *cond, GlobalVariable *exc,
-                               jl_codectx_t *ctx)
+static void raise_exception_if(Value *cond, GlobalVariable *exc, jl_codectx_t *ctx)
 {
     raise_exception_if(cond, (Value*)builder.CreateLoad(exc, false), ctx);
 }
@@ -919,8 +917,7 @@ static void emit_typecheck(Value *x, jl_value_t *type, const std::string &msg,
                            jl_codectx_t *ctx)
 {
     Value *istype;
-    if (jl_is_tuple_type(type) ||
-        !jl_is_leaf_type(type)) {
+    if (jl_is_type_type(type) || !jl_is_leaf_type(type)) {
         istype = builder.
             CreateICmpNE(builder.CreateCall3(prepare_call(jlsubtype_func), x, literal_pointer_val(type),
                                              ConstantInt::get(T_int32,1)),
@@ -998,9 +995,8 @@ static Value *typed_load(Value *ptr, Value *idx_0based, jl_value_t *jltype,
     else
         data = ptr;
     Value *elt = tbaa_decorate(tbaa, builder.CreateLoad(builder.CreateGEP(data, idx_0based), false));
-    if (elty == jl_pvalue_llvmt) {
+    if (elty == jl_pvalue_llvmt)
         null_pointer_check(elt, ctx);
-    }
     if (isbool)
         return builder.CreateTrunc(elt, T_int1);
     return mark_julia_type(elt, jltype);
@@ -1017,8 +1013,9 @@ static void typed_store(Value *ptr, Value *idx_0based, Value *rhs,
     if (elty == T_void)
         return;
     if (elty==T_int1) { elty = T_int8; }
-    if (jl_isbits(jltype) && ((jl_datatype_t*)jltype)->size > 0)
+    if (jl_isbits(jltype) && ((jl_datatype_t*)jltype)->size > 0) {
         rhs = emit_unbox(elty, rhs, jltype);
+    }
     else {
         rhs = boxed(rhs,ctx);
         if (parent != NULL) emit_write_barrier(ctx, parent, rhs);
@@ -1138,13 +1135,13 @@ static Value *emit_getfield_unknownidx(Value *strct, Value *idx, jl_datatype_t *
                         builder.CreateGEP(
                             builder.CreateBitCast(strct, jl_ppvalue_llvmt),
                             idx)));
-            if ((unsigned)stt->ninitialized != jl_svec_len(stt->types))
+            if ((unsigned)stt->ninitialized != nfields)
                 null_pointer_check(fld, ctx);
             return fld;
         }
         else if (is_tupletype_homogeneous(stt->types)) {
             assert(nfields > 0); // nf==0 trapped by all_pointers case
-            jl_value_t *jt = jl_field_type(stt->types, 0);
+            jl_value_t *jt = jl_field_type(stt, 0);
             idx = emit_bounds_check(strct, NULL, idx, ConstantInt::get(T_size, nfields), ctx);
             Value *ptr = data_pointer(strct);
             return typed_load(ptr, idx, jt, ctx, stt->mutabl ? tbaa_user : tbaa_immut);
@@ -1338,7 +1335,7 @@ static Value *emit_array_nd_index(Value *a, jl_value_t *ex, size_t nd, jl_value_
 #if CHECK_BOUNDS==1
     bool bc = ((ctx->boundsCheck.empty() || ctx->boundsCheck.back()==true) &&
                jl_options.check_bounds != JL_OPTIONS_CHECK_BOUNDS_OFF) ||
-              jl_options.check_bounds == JL_OPTIONS_CHECK_BOUNDS_ON;
+        jl_options.check_bounds == JL_OPTIONS_CHECK_BOUNDS_ON;
     BasicBlock *failBB=NULL, *endBB=NULL;
     if (bc) {
         failBB = BasicBlock::Create(getGlobalContext(), "oob");
@@ -1423,22 +1420,14 @@ static Value *allocate_box_dynamic(Value *jlty, Value *nb, Value *v)
 
 static jl_value_t *static_void_instance(jl_value_t *jt)
 {
-    if (jt == (jl_value_t*)jl_simplevector_type)
-        return (jl_value_t*)jl_emptysvec;
-    if (jl_is_datatype(jt)) {
-        jl_datatype_t *jb = (jl_datatype_t*)jt;
-        if (jb->instance == NULL)
-            // if we can't get an instance then this was an UndefValue due
-            // to throwing an error.
-            return (jl_value_t*)jl_nothing;
-        //assert(jb->instance != NULL);
-        return (jl_value_t*)jb->instance;
-    }
-    else if (jt == (jl_value_t*)jl_void_type) {
+    assert(jl_is_datatype(jt));
+    jl_datatype_t *jb = (jl_datatype_t*)jt;
+    if (jb->instance == NULL)
+        // if we can't get an instance then this was an UndefValue due
+        // to throwing an error.
         return (jl_value_t*)jl_nothing;
-    }
-    assert(false);
-    return NULL;
+    //assert(jb->instance != NULL);
+    return (jl_value_t*)jb->instance;
 }
 
 static jl_value_t *static_constant_instance(Constant *constant, jl_value_t *jt)
@@ -1498,7 +1487,6 @@ static jl_value_t *static_constant_instance(Constant *constant, jl_value_t *jt)
     JL_GC_POP();
     return tpl;
 }
-
 
 // this is used to wrap values for generic contexts, where a
 // dynamically-typed value is required (e.g. argument to unknown function).
@@ -1620,7 +1608,7 @@ static Value* emit_allocobj(size_t static_size)
         return builder.CreateCall(prepare_call(jlalloc3w_func));
     else
         return builder.CreateCall(prepare_call(jlallocobj_func),
-                       ConstantInt::get(T_size, static_size));
+                                  ConstantInt::get(T_size, static_size));
 }
 
 // if ptr is NULL this emits a write barrier _back_
