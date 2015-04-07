@@ -107,15 +107,15 @@ FloatRange(a::FloatingPoint, s::FloatingPoint, l::Real, d::FloatingPoint) =
 # float rationalization helper
 function rat(x)
     y = x
-    a = d = 1
-    b = c = 0
+    a = d = Int64(1)
+    b = c = Int64(0)
     m = maxintfloat(Float32)
     while abs(y) <= m
-        f = trunc(Int,y)
+        f = trunc(Int64,y)
         y -= f
         a, c = f*a + c, a
         b, d = f*b + d, b
-        max(abs(a),abs(b)) <= convert(Int,m) || return c, d
+        max(abs(a),abs(b)) <= convert(Int64,m) || return c, d
         oftype(x,a)/oftype(x,b) == x && break
         y = inv(y)
     end
